@@ -1,0 +1,43 @@
+# Include important files in source distribution
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include pyproject.toml
+include setup.py
+
+# Include package data
+recursive-include src/docling_onnx_models *.py
+recursive-include src/docling_onnx_models *.pyi
+include src/docling_onnx_models/py.typed
+
+# Include documentation
+recursive-include docs *.md *.rst *.txt *.py
+recursive-include docs *.png *.jpg *.svg
+
+# Include tests
+recursive-include tests *.py
+recursive-include tests *.json *.txt *.yaml *.yml
+
+# Include scripts
+recursive-include scripts *.py *.sh
+
+# Include CI/CD configuration
+recursive-include .github *.yml *.yaml
+include .pre-commit-config.yaml
+
+# Exclude development and build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude .git*
+global-exclude .mypy_cache
+global-exclude .pytest_cache
+global-exclude .coverage
+global-exclude htmlcov
+global-exclude build
+global-exclude dist
+global-exclude *.egg-info
