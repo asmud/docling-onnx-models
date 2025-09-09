@@ -96,12 +96,13 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/docling-project/docling-onnx-models"
-Repository = "https://github.com/docling-project/docling-onnx-models.git"
-Documentation = "https://docling-project.github.io/docling-onnx-models/"
-Changelog = "https://github.com/docling-project/docling-onnx-models/blob/main/CHANGELOG.md"
-"Bug Reports" = "https://github.com/docling-project/docling-onnx-models/issues"
-"Source Code" = "https://github.com/docling-project/docling-onnx-models"
+Homepage = "https://github.com/asmud/docling-onnx-models"
+Repository = "https://github.com/asmud/docling-onnx-models.git"
+Documentation = "https://asmud.github.io/docling-onnx-models/"
+Changelog = "https://github.com/asmud/docling-onnx-models/blob/main/CHANGELOG.md"
+"Bug Reports" = "https://github.com/asmud/docling-onnx-models/issues"
+"Source Code" = "https://github.com/asmud/docling-onnx-models"
+"PyPI" = "https://pypi.org/project/docling-onnx-models/"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
