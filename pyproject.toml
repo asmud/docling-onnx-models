@@ -109,6 +109,7 @@ packages = ["docling_onnx_models"]
 
 [tool.setuptools_scm]
 write_to = "src/docling_onnx_models/_version.py"
+local_scheme = "no-local-version"
 
 [tool.setuptools.package-data]
 docling_onnx_models = ["py.typed"]
