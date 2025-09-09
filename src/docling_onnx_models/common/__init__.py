@@ -5,7 +5,7 @@
 
 """Common utilities for ONNX models."""
 
-from .base_predictor import BaseONNXPredictor, get_optimal_providers
+from .base_predictor import BaseONNXPredictor, get_optimal_providers, get_provider_options, is_mps_available
 from .model_utils import (
     create_onnx_model_config,
     detect_onnx_model,
@@ -20,6 +20,8 @@ from .utils import prepare_batch_input, prepare_image_input
 __all__ = [
     "BaseONNXPredictor",
     "get_optimal_providers",
+    "get_provider_options",
+    "is_mps_available",
     "prepare_image_input",
     "prepare_batch_input",
     "detect_onnx_model",

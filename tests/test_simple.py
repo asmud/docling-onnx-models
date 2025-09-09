@@ -22,6 +22,54 @@ class TestProviders:
         providers = get_optimal_providers("auto")
         assert isinstance(providers, list)
         assert "CPUExecutionProvider" in providers
+    
+    def test_get_provider_options_mps(self):
+        """Test MPS provider configuration."""
+        from docling_onnx_models.common import get_provider_options, is_mps_available
+        
+        # Test MPS availability detection
+        mps_available = is_mps_available()
+        assert isinstance(mps_available, bool)
+        
+        # Test MPS provider configuration
+        providers = get_provider_options("mps")
+        assert isinstance(providers, list)
+        
+        if mps_available:
+            # Should have CoreML with MPS config on macOS
+            coreml_found = False
+            for provider in providers:
+                if isinstance(provider, tuple) and provider[0] == "CoreMLExecutionProvider":
+                    coreml_found = True
+                    config = provider[1]
+                    assert config["MLComputeUnits"] == "CPUAndGPU"
+                    assert config["ModelFormat"] == "MLProgram"
+                    break
+            assert coreml_found, "CoreML provider should be configured for MPS"
+        
+        # Should always fallback to CPU
+        assert "CPUExecutionProvider" in [
+            p if isinstance(p, str) else p[0] for p in providers
+        ]
+    
+    def test_get_provider_options_coreml(self):
+        """Test CoreML provider configuration."""
+        from docling_onnx_models.common import get_provider_options, is_mps_available
+        
+        providers = get_provider_options("coreml")
+        assert isinstance(providers, list)
+        
+        if is_mps_available():
+            # Should have CoreML with ALL compute units
+            coreml_found = False
+            for provider in providers:
+                if isinstance(provider, tuple) and provider[0] == "CoreMLExecutionProvider":
+                    coreml_found = True
+                    config = provider[1]
+                    assert config["MLComputeUnits"] == "ALL"
+                    assert config["ModelFormat"] == "MLProgram"
+                    break
+            assert coreml_found, "CoreML provider should be configured"
 
 
 class TestModelUtils:

@@ -22,6 +22,124 @@ _log = logging.getLogger(__name__)
 _model_init_lock = threading.Lock()
 
 
+def is_mps_available() -> bool:
+    """
+    Check if MPS (Metal Performance Shaders) acceleration is available via CoreML.
+
+    Returns
+    -------
+    bool
+        True if MPS acceleration is available through CoreMLExecutionProvider.
+    """
+    if platform.system() != "Darwin":
+        return False
+    
+    available_providers = ort.get_available_providers()
+    return "CoreMLExecutionProvider" in available_providers
+
+
+def get_provider_options(device: str = "auto") -> List[Union[str, tuple]]:
+    """
+    Get execution providers with configuration options for optimal performance.
+
+    Parameters
+    ----------
+    device : str, optional
+        Device preference ('auto', 'cpu', 'cuda', 'coreml', 'mps'), by default "auto".
+
+    Returns
+    -------
+    List[Union[str, tuple]]
+        List of execution providers with configuration options.
+    """
+    available_providers = ort.get_available_providers()
+    providers = []
+
+    if device == "auto":
+        system = platform.system()
+
+        if system == "Darwin":  # macOS
+            if "CoreMLExecutionProvider" in available_providers:
+                # Configure CoreML with GPU+Neural Engine for optimal performance
+                coreml_config = {
+                    "MLComputeUnits": "ALL",  # Use CPU, GPU, and Neural Engine
+                    "ModelFormat": "MLProgram",  # Use the newer MLProgram format
+                    "RequireStaticInputShapes": False,
+                }
+                providers.append(("CoreMLExecutionProvider", coreml_config))
+                _log.debug("Added CoreMLExecutionProvider with GPU+Neural Engine support for macOS")
+
+            if "CPUExecutionProvider" in available_providers:
+                providers.append("CPUExecutionProvider")
+
+        elif system in ["Linux", "Windows"]:
+            if "CUDAExecutionProvider" in available_providers:
+                providers.append("CUDAExecutionProvider")
+                _log.debug("Added CUDAExecutionProvider")
+
+            if system == "Windows" and "DmlExecutionProvider" in available_providers:
+                providers.append("DmlExecutionProvider")
+                _log.debug("Added DmlExecutionProvider for Windows")
+
+            if "CPUExecutionProvider" in available_providers:
+                providers.append("CPUExecutionProvider")
+
+        else:
+            if "CPUExecutionProvider" in available_providers:
+                providers.append("CPUExecutionProvider")
+
+    elif device.lower() == "cuda":
+        if "CUDAExecutionProvider" in available_providers:
+            providers.append("CUDAExecutionProvider")
+        else:
+            _log.warning("CUDA requested but not available, falling back to CPU")
+        if "CPUExecutionProvider" in available_providers:
+            providers.append("CPUExecutionProvider")
+
+    elif device.lower() in ["coreml", "mps"]:
+        if "CoreMLExecutionProvider" in available_providers:
+            # Configure CoreML with optimal settings for MPS/GPU acceleration
+            compute_units = "ALL"  # Default to using all available compute units
+            if device.lower() == "mps":
+                # For explicit MPS request, prioritize GPU but allow fallback
+                compute_units = "CPUAndGPU"
+                _log.info("Configuring CoreML for MPS (Metal Performance Shaders) acceleration")
+            
+            coreml_config = {
+                "MLComputeUnits": compute_units,
+                "ModelFormat": "MLProgram",
+                "RequireStaticInputShapes": False,
+            }
+            providers.append(("CoreMLExecutionProvider", coreml_config))
+        else:
+            provider_name = "CoreML/MPS" if device.lower() == "mps" else "CoreML"
+            _log.warning(f"{provider_name} requested but CoreMLExecutionProvider not available, falling back to CPU")
+        if "CPUExecutionProvider" in available_providers:
+            providers.append("CPUExecutionProvider")
+
+    elif device.lower() == "cpu":
+        if "CPUExecutionProvider" in available_providers:
+            providers.append("CPUExecutionProvider")
+
+    else:
+        # Custom device specification - assume it's a provider name
+        if device in available_providers:
+            providers.append(device)
+        if "CPUExecutionProvider" in available_providers:
+            providers.append("CPUExecutionProvider")
+
+    # Always ensure we have CPU as final fallback
+    if not providers or not any(
+        p == "CPUExecutionProvider" or (isinstance(p, tuple) and p[0] == "CPUExecutionProvider")
+        for p in providers
+    ):
+        if "CPUExecutionProvider" in available_providers:
+            providers.append("CPUExecutionProvider")
+
+    _log.info(f"Selected execution providers: {[p[0] if isinstance(p, tuple) else p for p in providers]}")
+    return providers
+
+
 def get_optimal_providers(device: str = "auto") -> List[str]:
     """
     Get optimal execution providers based on system capabilities and device preference.
@@ -29,7 +147,7 @@ def get_optimal_providers(device: str = "auto") -> List[str]:
     Parameters
     ----------
     device : str, optional
-        Device preference ('auto', 'cpu', 'cuda', 'coreml'), by default "auto".
+        Device preference ('auto', 'cpu', 'cuda', 'coreml', 'mps'), by default "auto".
 
     Returns
     -------
@@ -81,11 +199,12 @@ def get_optimal_providers(device: str = "auto") -> List[str]:
         if "CPUExecutionProvider" in available_providers:
             providers.append("CPUExecutionProvider")
 
-    elif device.lower() == "coreml":
+    elif device.lower() in ["coreml", "mps"]:
         if "CoreMLExecutionProvider" in available_providers:
             providers.append("CoreMLExecutionProvider")
         else:
-            _log.warning("CoreML requested but not available, falling back to CPU")
+            provider_name = "CoreML/MPS" if device.lower() == "mps" else "CoreML"
+            _log.warning(f"{provider_name} requested but CoreMLExecutionProvider not available, falling back to CPU")
         if "CPUExecutionProvider" in available_providers:
             providers.append("CPUExecutionProvider")
 
@@ -132,7 +251,7 @@ class BaseONNXPredictor(ABC):
         model_path : str
             Path to the ONNX model file.
         device : str, optional
-            Device to run inference on ('auto', 'cpu', 'cuda', 'coreml'), by default "auto".
+            Device to run inference on ('auto', 'cpu', 'cuda', 'coreml', 'mps'), by default "auto".
         num_threads : int, optional
             Number of threads for CPU inference, by default 4.
         providers : List[str], optional
@@ -148,7 +267,7 @@ class BaseONNXPredictor(ABC):
 
         # Set up execution providers
         if providers is None:
-            providers = get_optimal_providers(device)
+            providers = get_provider_options(device)
 
         # Configure session options
         session_options = ort.SessionOptions()
