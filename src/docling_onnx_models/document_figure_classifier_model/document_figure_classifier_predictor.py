@@ -20,7 +20,7 @@ _log = logging.getLogger(__name__)
 class DocumentFigureClassifierPredictor(BaseONNXPredictor):
     """
     ONNX-based document figure classifier.
-    
+
     Classifies figures as 1 out of 16 possible classes, providing the same
     interface as the original DocumentFigureClassifierPredictor from docling-ibm-models.
 
@@ -75,13 +75,13 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
         # Set up paths
         model_path = os.path.join(artifacts_path, onnx_model_name)
         self._config_path = os.path.join(artifacts_path, "config.json")
-        
+
         # Load configuration if available
         self._load_config()
-        
+
         # Initialize base ONNX predictor
         super().__init__(model_path, device, num_threads, providers)
-        
+
         _log.debug("DocumentFigureClassifierPredictor initialized")
 
     def _load_config(self):
@@ -105,18 +105,18 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
             "signature",
             "stamp",
         ]
-        
+
         # Default preprocessing parameters (EfficientNet-style)
         self._image_mean = [0.485, 0.456, 0.406]
         self._image_std = [0.229, 0.224, 0.225]
         self._image_size = (224, 224)  # (height, width)
-        
+
         # Load config if it exists
         if os.path.exists(self._config_path):
             try:
-                with open(self._config_path, 'r') as f:
+                with open(self._config_path, "r") as f:
                     config = json.load(f)
-                
+
                 # Override defaults with config values
                 self._classes = config.get("id2label", {})
                 if isinstance(self._classes, dict):
@@ -124,11 +124,11 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
                     self._classes = [
                         self._classes[str(i)] for i in range(len(self._classes))
                     ]
-                
+
                 # Get preprocessing parameters
                 self._image_mean = config.get("image_mean", self._image_mean)
                 self._image_std = config.get("image_std", self._image_std)
-                
+
                 # Get image size
                 if "image_size" in config:
                     size = config["image_size"]
@@ -136,7 +136,7 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
                         self._image_size = tuple(size)
                     else:
                         self._image_size = (size, size)
-                        
+
             except Exception as e:
                 _log.warning(f"Failed to load config, using defaults: {e}")
 
@@ -145,18 +145,20 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
     def info(self) -> dict:
         """
         Get predictor configuration information.
-        
+
         Returns
         -------
         dict
             Dictionary containing predictor configuration details.
         """
         base_info = super().info()
-        base_info.update({
-            "num_classes": len(self._classes),
-            "classes": self._classes,
-            "image_size": self._image_size,
-        })
+        base_info.update(
+            {
+                "num_classes": len(self._classes),
+                "classes": self._classes,
+                "image_size": self._image_size,
+            }
+        )
         return base_info
 
     def _preprocess_images(
@@ -164,12 +166,12 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
     ) -> np.ndarray:
         """
         Preprocess images for model input.
-        
+
         Parameters
         ----------
         images : List[Union[Image.Image, np.ndarray]]
             List of input images.
-            
+
         Returns
         -------
         np.ndarray
@@ -177,7 +179,7 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
         """
         if not images:
             return np.array([])
-        
+
         # Use the common utility for batch preparation
         batch_input = prepare_batch_input(
             images,
@@ -186,7 +188,7 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
             mean=self._image_mean,
             std=self._image_std,
         )
-        
+
         return batch_input
 
     def _postprocess_predictions(
@@ -194,12 +196,12 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
     ) -> List[List[Tuple[str, float]]]:
         """
         Post-process model outputs to class predictions.
-        
+
         Parameters
         ----------
         outputs : List[np.ndarray]
             Raw model outputs.
-            
+
         Returns
         -------
         List[List[Tuple[str, float]]]
@@ -208,24 +210,23 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
         """
         # Get logits (first output)
         logits = outputs[0]  # Shape: [batch_size, num_classes]
-        
+
         # Apply softmax to get probabilities
         probabilities = self._softmax(logits)
-        
+
         batch_predictions = []
-        
+
         for probs in probabilities:
             # Create (class_name, confidence) pairs
             predictions = [
-                (self._classes[i], float(probs[i])) 
-                for i in range(len(self._classes))
+                (self._classes[i], float(probs[i])) for i in range(len(self._classes))
             ]
-            
+
             # Sort by confidence descending
             predictions.sort(key=lambda x: x[1], reverse=True)
-            
+
             batch_predictions.append(predictions)
-        
+
         return batch_predictions
 
     def _softmax(self, x: np.ndarray) -> np.ndarray:
@@ -239,12 +240,12 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
     ) -> List[List[Tuple[str, float]]]:
         """
         Predict figure classes for input images.
-        
+
         Parameters
         ----------
         images : List[Union[Image.Image, np.ndarray]]
             List of images to classify.
-            
+
         Returns
         -------
         List[List[Tuple[str, float]]]
@@ -253,25 +254,25 @@ class DocumentFigureClassifierPredictor(BaseONNXPredictor):
         """
         if not images:
             return []
-        
+
         # Preprocess images
         batch_input = self._preprocess_images(images)
-        
+
         if batch_input.size == 0:
             return []
-        
+
         # Run inference
         # Note: Input name might vary - you may need to check your ONNX model
         input_name = self.input_names[0] if self.input_names else "input"
         inputs = {input_name: batch_input}
-        
+
         try:
             outputs = self.run_inference(inputs)
         except Exception as e:
             _log.error(f"Inference failed: {e}")
             return [[] for _ in images]
-        
+
         # Post-process predictions
         predictions = self._postprocess_predictions(outputs)
-        
+
         return predictions

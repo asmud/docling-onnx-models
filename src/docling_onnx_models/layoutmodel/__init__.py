@@ -5,7 +5,7 @@
 
 """ONNX-based layout model implementations."""
 
-from .layout_predictor import LayoutPredictor
 from .labels import LayoutLabels
+from .layout_predictor import LayoutPredictor
 
 __all__ = ["LayoutPredictor", "LayoutLabels"]

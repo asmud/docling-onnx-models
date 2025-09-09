@@ -8,4 +8,4 @@
 # Note: Code formula model ONNX implementation would go here
 # Currently uses HuggingFace transformers which may not need ONNX conversion
 
-__all__ = []
+__all__: list[str] = []

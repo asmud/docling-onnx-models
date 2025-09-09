@@ -20,7 +20,7 @@ _log = logging.getLogger(__name__)
 class TFPredictor(BaseONNXPredictor):
     """
     ONNX-based table structure predictor.
-    
+
     This class provides the same interface as the original TFPredictor
     from docling-ibm-models but uses ONNX Runtime for inference.
     """
@@ -28,7 +28,7 @@ class TFPredictor(BaseONNXPredictor):
     def __init__(
         self,
         config: Dict[str, Any],
-        device: str = "cpu", 
+        device: str = "cpu",
         num_threads: int = 4,
         onnx_model_name: str = "model.onnx",
         providers: Optional[List[str]] = None,
@@ -55,17 +55,17 @@ class TFPredictor(BaseONNXPredictor):
             When required model files are missing.
         """
         self._config = config
-        
+
         # Get model path from config
         model_dir = config["model"]["save_dir"]
         model_path = os.path.join(model_dir, onnx_model_name)
-        
+
         # Initialize base ONNX predictor
         super().__init__(model_path, device, num_threads, providers)
-        
+
         # Load additional configuration
         self._load_table_config()
-        
+
         _log.debug("TFPredictor initialized with ONNX backend")
 
     def _load_table_config(self):
@@ -73,25 +73,29 @@ class TFPredictor(BaseONNXPredictor):
         # Extract table processing parameters from config
         self.max_steps = self._config.get("predict", {}).get("max_steps", 512)
         self.beam_size = self._config.get("predict", {}).get("beam_size", 1)
-        
+
         # Set input preprocessing parameters
         self.input_size = self._config.get("model", {}).get("input_size", [640, 640])
         if isinstance(self.input_size, int):
             self.input_size = [self.input_size, self.input_size]
-        
-        _log.debug(f"Table config loaded: max_steps={self.max_steps}, beam_size={self.beam_size}")
 
-    def resize_img(self, image: np.ndarray, height: int = 1024) -> tuple[np.ndarray, float]:
+        _log.debug(
+            f"Table config loaded: max_steps={self.max_steps}, beam_size={self.beam_size}"
+        )
+
+    def resize_img(
+        self, image: np.ndarray, height: int = 1024
+    ) -> tuple[np.ndarray, float]:
         """
         Resize image while maintaining aspect ratio.
-        
+
         Parameters
         ----------
         image : np.ndarray
             Input image array.
         height : int, optional
             Target height, by default 1024.
-            
+
         Returns
         -------
         tuple[np.ndarray, float]
@@ -100,20 +104,18 @@ class TFPredictor(BaseONNXPredictor):
         return resize_image_with_aspect_ratio(image, height, cv2.INTER_LINEAR)
 
     def _preprocess_table_image(
-        self, 
-        table_image: np.ndarray,
-        page_data: Dict[str, Any]
+        self, table_image: np.ndarray, page_data: Dict[str, Any]
     ) -> np.ndarray:
         """
         Preprocess table image for model input.
-        
+
         Parameters
         ----------
         table_image : np.ndarray
             Cropped table image.
         page_data : Dict[str, Any]
             Page metadata and token information.
-            
+
         Returns
         -------
         np.ndarray
@@ -125,20 +127,20 @@ class TFPredictor(BaseONNXPredictor):
         else:
             h, w = table_image.shape
             table_image = cv2.cvtColor(table_image, cv2.COLOR_GRAY2RGB)
-        
+
         # Resize to input size
         target_h, target_w = self.input_size
         resized_image = cv2.resize(table_image, (target_w, target_h))
-        
+
         # Normalize to [0, 1] and convert to float32
         image_tensor = resized_image.astype(np.float32) / 255.0
-        
+
         # Convert HWC to CHW
         image_tensor = np.transpose(image_tensor, (2, 0, 1))
-        
+
         # Add batch dimension
         image_tensor = np.expand_dims(image_tensor, axis=0)
-        
+
         return image_tensor
 
     def _postprocess_table_predictions(
@@ -150,7 +152,7 @@ class TFPredictor(BaseONNXPredictor):
     ) -> tuple[List[Dict], Dict]:
         """
         Post-process model outputs to table structure format.
-        
+
         Parameters
         ----------
         outputs : List[np.ndarray]
@@ -161,7 +163,7 @@ class TFPredictor(BaseONNXPredictor):
             Table bounding box coordinates.
         do_matching : bool, optional
             Whether to perform cell matching, by default True.
-            
+
         Returns
         -------
         tuple[List[Dict], Dict]
@@ -169,41 +171,45 @@ class TFPredictor(BaseONNXPredictor):
         """
         # This is a simplified implementation
         # You'll need to adapt this based on your specific ONNX model outputs
-        
+
         # For now, create a basic structure that matches the expected format
         tf_responses = []
-        
+
         # Extract table structure information from model outputs
         # This will vary significantly based on your ONNX model architecture
-        
+
         if len(outputs) > 0:
             # Assuming the model outputs table cell predictions
             predictions = outputs[0]  # Shape varies by model
-            
+
             # Create mock responses that match the expected format
             # You'll need to replace this with actual post-processing logic
-            for i in range(min(10, len(predictions) if len(predictions.shape) > 0 else 1)):
-                tf_responses.append({
-                    "bbox": [
-                        table_bbox[0] + i * 20,  # Mock coordinates
-                        table_bbox[1] + i * 15,
-                        table_bbox[0] + (i + 1) * 20,
-                        table_bbox[1] + (i + 1) * 15,
-                    ],
-                    "text": f"Cell_{i}",  # Mock text
-                    "row_id": i // 2,  # Mock row assignment
-                    "col_id": i % 2,   # Mock column assignment
-                })
-        
+            for i in range(
+                min(10, len(predictions) if len(predictions.shape) > 0 else 1)
+            ):
+                tf_responses.append(
+                    {
+                        "bbox": [
+                            table_bbox[0] + i * 20,  # Mock coordinates
+                            table_bbox[1] + i * 15,
+                            table_bbox[0] + (i + 1) * 20,
+                            table_bbox[1] + (i + 1) * 15,
+                        ],
+                        "text": f"Cell_{i}",  # Mock text
+                        "row_id": i // 2,  # Mock row assignment
+                        "col_id": i % 2,  # Mock column assignment
+                    }
+                )
+
         # Create predict details
         predict_details = {
             "num_rows": len(set(resp.get("row_id", 0) for resp in tf_responses)),
             "num_cols": len(set(resp.get("col_id", 0) for resp in tf_responses)),
             "prediction": {
                 "rs_seq": ["fcel", "ecel"] * (len(tf_responses) // 2),  # Mock sequence
-            }
+            },
         }
-        
+
         return tf_responses, predict_details
 
     def predict_dummy(
@@ -216,7 +222,7 @@ class TFPredictor(BaseONNXPredictor):
     ) -> tuple[List[Dict], Dict]:
         """
         Dummy prediction method for fallback scenarios.
-        
+
         Parameters
         ----------
         iocr_page : Dict[str, Any]
@@ -229,7 +235,7 @@ class TFPredictor(BaseONNXPredictor):
             Scale factor applied to the image.
         eval_res_preds : Optional[Dict], optional
             Pre-computed predictions, by default None.
-            
+
         Returns
         -------
         tuple[List[Dict], Dict]
@@ -249,7 +255,7 @@ class TFPredictor(BaseONNXPredictor):
     ) -> tuple[List[Dict], Dict]:
         """
         Predict table structure for a single table.
-        
+
         Parameters
         ----------
         iocr_page : Dict[str, Any]
@@ -264,7 +270,7 @@ class TFPredictor(BaseONNXPredictor):
             Pre-computed predictions, by default None.
         correct_overlapping_cells : bool, optional
             Whether to correct overlapping cells, by default False.
-            
+
         Returns
         -------
         tuple[List[Dict], Dict]
@@ -273,20 +279,20 @@ class TFPredictor(BaseONNXPredictor):
         try:
             # Preprocess the table image
             image_tensor = self._preprocess_table_image(table_image, iocr_page)
-            
+
             # Run inference
             input_name = self.input_names[0] if self.input_names else "input"
             inputs = {input_name: image_tensor}
-            
+
             outputs = self.run_inference(inputs)
-            
+
             # Post-process predictions
             tf_responses, predict_details = self._postprocess_table_predictions(
                 outputs, iocr_page, table_bbox, do_matching=True
             )
-            
+
             return tf_responses, predict_details
-            
+
         except Exception as e:
             _log.error(f"Table prediction failed: {e}")
             return self.predict_dummy(
@@ -332,13 +338,13 @@ class TFPredictor(BaseONNXPredictor):
         for table_bbox in table_bboxes:
             # Downscale table bounding box to the size of new image
             scaled_bbox = [coord * scale_factor for coord in table_bbox]
-            
+
             # Extract table image
             table_image = page_image_resized[
                 round(scaled_bbox[1]) : round(scaled_bbox[3]),
                 round(scaled_bbox[0]) : round(scaled_bbox[2]),
             ]
-            
+
             # Predict table structure
             if do_matching:
                 tf_responses, predict_details = self.predict(
@@ -355,9 +361,11 @@ class TFPredictor(BaseONNXPredictor):
                 )
 
             # Store results
-            multi_tf_output.append({
-                "tf_responses": tf_responses,
-                "predict_details": predict_details,
-            })
+            multi_tf_output.append(
+                {
+                    "tf_responses": tf_responses,
+                    "predict_details": predict_details,
+                }
+            )
 
         return multi_tf_output

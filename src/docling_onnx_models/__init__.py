@@ -14,7 +14,7 @@ and cross-platform compatibility.
 __version__ = "1.0.0"
 __all__ = [
     "layoutmodel",
-    "tableformer", 
+    "tableformer",
     "document_figure_classifier_model",
     "code_formula_model",
     "common",
